@@ -1,5 +1,5 @@
 # https://data.nasa.gov/resource/eva.json (with modifications)
-data_f = open('/home/sarah/Projects/astronaut-analysieva_s/eva-data.json', 'r')
+data_f = open('/home/sarah/Projects/astronaut-analysis/eva-data.json', 'r')
 data_t = open('/home/sarah/Projects/astronaut-analysis/eva-data.csv','w')
 g_file = 'cumulative_eva_graph.png'
 
