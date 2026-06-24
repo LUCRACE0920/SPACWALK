@@ -1,20 +1,22 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import sys
-import re # added this line
+import re
 
 
-def main(input_file, output_file, graph_file):
+def main(input_file, output_file, duration_by_astronaut_output_file, graph_file):
     print("--START--")
 
     # Read the data from JSON file
     eva_data = read_json_to_dataframe(input_file)
 
-    # Calculate and add crew size to data
-    eva_data = add_crew_size_column(eva_data) # added this line
-
     # Convert and export data to CSV file
     write_dataframe_to_csv(eva_data, output_file)
+
+    # Calculate summary table for total EVA per astronaut
+    duration_by_astronaut_df = summary_duration_by_astronaut(eva_data)
+    # Save summary duration data by each astronaut to CSV file
+    write_dataframe_to_csv(duration_by_astronaut_df, duration_by_astronaut_output_file)
 
     # Sort dataframe by date ready to be plotted (date values are on x-axis)
     eva_data.sort_values('date', inplace=True)
@@ -23,6 +25,7 @@ def main(input_file, output_file, graph_file):
     plot_cumulative_time_in_space(eva_data, graph_file)
 
     print("--END--")
+
 
 def read_json_to_dataframe(input_file):
     """
@@ -33,7 +36,7 @@ def read_json_to_dataframe(input_file):
         input_file (file or str): The file object or path to the JSON file.
 
     Returns:
-         eva_df (pd.DataFrame): The cleaned and sorted data as a dataframe structure
+         eva_df (pd.DataFrame): The cleaned data as a dataframe structure
     """
     print(f'Reading JSON file {input_file}')
     # Read the data from a JSON file into a Pandas dataframe
@@ -50,13 +53,42 @@ def write_dataframe_to_csv(df, output_file):
 
     Args:
         df (pd.DataFrame): The input dataframe.
-        output_file (str): The path to the output CSV file.
+        output_file (file or str): The file object or path to the output CSV file.
 
     Returns:
-        (None):
+        None
     """
     print(f'Saving to CSV file {output_file}')
-    df.to_csv(output_file, index=False)
+    # Save dataframe to CSV file for later analysis
+    df.to_csv(output_file, index=False, encoding='utf-8')
+
+
+def plot_cumulative_time_in_space(df, graph_file):
+    """
+    Plot the cumulative time spent in space over years.
+
+    Convert the duration column from strings to number of hours
+    Calculate cumulative sum of durations
+    Generate a plot of cumulative time spent in space over years and
+    save it to the specified location
+
+    Args:
+        df (pd.DataFrame): The input dataframe.
+        graph_file (file or str): The file object or path to the output graph file.
+
+    Returns:
+        None
+    """
+    print(f'Plotting cumulative spacewalk duration and saving to {graph_file}')
+    df = add_duration_hours(df)
+    df['cumulative_time'] = df['duration_hours'].cumsum()
+    plt.plot(df['date'], df['cumulative_time'], 'ko-')
+    plt.xlabel('Year')
+    plt.ylabel('Total time spent in space to date (hours)')
+    plt.tight_layout()
+    plt.savefig(graph_file)
+    plt.show()
+
 
 def text_to_duration(duration):
     """
@@ -69,7 +101,7 @@ def text_to_duration(duration):
         duration_hours (float): The duration in hours
     """
     hours, minutes = duration.split(":")
-    duration_hours = int(hours) + int(minutes)/60  # there is an intentional bug on this line (should divide by 60 not 6)
+    duration_hours = int(hours) + int(minutes)/60
     return duration_hours
 
 
@@ -89,32 +121,6 @@ def add_duration_hours(df):
     )
     return df_copy
 
-
-def plot_cumulative_time_in_space(df, graph_file):
-    """
-    Plot the cumulative time spent in space over years
-
-    Convert the duration column from strings to number of hours
-    Calculate cumulative sum of durations
-    Generate a plot of cumulative time spent in space over years and
-    save it to the specified location
-
-    Args:
-        df (pd.DataFrame): The input dataframe.
-        graph_file (str): The path to the output graph file.
-
-    Returns:
-        (None):
-    """
-    print(f'Plotting cumulative spacewalk duration and saving to {graph_file}')
-    df = add_duration_hours(df)
-    df['cumulative_time'] = df['duration_hours'].cumsum()
-    plt.plot(df.date, df.cumulative_time, 'ko-')
-    plt.xlabel('Year')
-    plt.ylabel('Total time spent in space to date (hours)')
-    plt.tight_layout()
-    plt.savefig(graph_file)
-    plt.show()
 
 def calculate_crew_size(crew):
     """
@@ -148,6 +154,27 @@ def add_crew_size_column(df):
     )
     return df_copy
 
+
+def summary_duration_by_astronaut(df):
+    """
+    Summarise the duration data by each astronaut and saves resulting table to a CSV file
+
+    Args: 
+        df (pd.DataFrame): Input dataframe to be summarised
+
+    
+    Returns:
+        sum_by_astro (pd.DataFrame): Data frame with a row for each astronaut and a summarised column 
+    """
+    print(f'Calculating summary of total EVA time by astronaut')
+    subset = df.loc[:,['crew', 'duration']] # subset to work with only relevant columns
+    subset = add_duration_hours(subset) # need duration_hours for easier calcs
+    subset = subset.drop('duration', axis=1) # dropping the extra 'duration' column as it contains string values not suitable for calculations
+    subset = subset.groupby('crew').sum() 
+    subset = subset.reset_index() # make group index a column in the dataframe
+    return subset
+
+
 if __name__ == "__main__":
 
     if len(sys.argv) < 3:
@@ -160,4 +187,6 @@ if __name__ == "__main__":
         print('Using custom input and output filenames')
 
     graph_file = 'results/cumulative_eva_graph.png'
-    main(input_file, output_file, graph_file)
+    duration_by_astronaut_output_file = 'results/duration_by_astronaut.csv'
+
+    main(input_file, output_file, duration_by_astronaut_output_file, graph_file)
