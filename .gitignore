@@ -6,5 +6,7 @@
 #python related
 __pycache__/
 venv_spacewalks/
+
 #documentation output
 site/
+
